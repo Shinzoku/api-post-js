@@ -1,139 +1,148 @@
-// POST
-var createButton = document.querySelector("#createButton");
-var categoryName = document.querySelector("#categoryName");
+// Configuration variables
+var APIURL = "http://127.0.0.1:8000/api";
+var categoriesAPIURL = APIURL + "/categories";
 
-var createCategory = function(event) {
-    var requestBody = {
-        "name": categoryName.value
-    };
-    fetch("https://127.0.0.1:8000/api/categories", {
+// future DOM interactions
+var pageTitleH1 = document.querySelector("#pageTitle")
+var infoZoneDiv = document.querySelector("#infoZone");
+var categorySelect = document.querySelector("#categories");
+var categoryNameInput = document.querySelector("#categoryName");
+var mainSection = document.querySelector("#main");
+
+// Visible button on page startup
+var createButton = document.createElement("button");
+createButton.innerText = "Créer"
+mainSection.appendChild(createButton);
+// Hidden buttons on page startup
+var updateButton = document.createElement("button");
+updateButton.innerText = "Mettre à jour";
+var deleteButton = document.createElement("button");
+deleteButton.innerText = "Supprimer";
+
+// function when a category is selected. Not related to the API
+var selectCategory = function() {
+    // rename H1
+    pageTitleH1.innerText = "Modification d’une catégorie";
+    // first of all, we fill the input field with the name of the category
+    categoryNameInput.value = document.querySelector("#option-" + categorySelect.value).innerHTML;
+    // update and delete button are shown
+    mainSection.appendChild(updateButton)
+    mainSection.appendChild(deleteButton);
+    // create button is removed
+    mainSection.removeChild(createButton)
+}
+
+/// function to reset form
+var resetForm = function() {
+    // Empty the input field
+    categoryNameInput.value = "";
+    // remove update and delete button
+    mainSection.removeChild(updateButton);
+    mainSection.removeChild(deleteButton);
+    // add create button
+    mainSection.appendChild(createButton);
+    // reset title
+    pageTitleH1.innerText = "Création d’une catégorie";
+}
+
+// function to create a new element
+var createCategory = function() {
+    // if no name is provided, we do nothing
+    if (categoryNameInput.value == "") {
+        return;
+    }
+    // we prepare the parameters
+    var requestParameters = {
+            "name": categoryNameInput.value
+        }
+        // we do the request
+    fetch(categoriesAPIURL, {
             method: "POST",
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestParameters)
+        })
+        .then((response) => {
+            if (response.status == 201) {
+                infoZoneDiv.textContent = "Création de la catégorie effectuée";
+                readCategories();
+            } else {
+                infoZoneDiv.textContent = "⚠ Une erreur est survenue lors de la création de la catégorie";
+            }
+        })
+}
+
+
+// function to get all categories and filling <select>
+var readCategories = function() {
+    // first we empty the select
+    while (categorySelect.firstChild) {
+        categorySelect.removeChild(categorySelect.firstChild);
+    }
+    // then we fetch data and fill the select
+    fetch(categoriesAPIURL, { method: "GET" })
+        .then(function(response) { return response.json() })
+        .then((responseJSON) => {
+            responseJSON["hydra:member"].forEach(category => {
+                categoryOption = document.createElement("option");
+                categoryOption.innerHTML = category["name"];
+                categoryOption.value = category["id"];
+                categoryOption.id = "option-" + category["id"];
+                categorySelect.appendChild(categoryOption);
+            });
+        })
+}
+
+var updateCategory = function() {
+    // if no name is provided, we do nothing
+    if (categoryNameInput.value == "") {
+        return;
+    }
+    // we prepare the parameters
+    var requestParameters = {
+        "name": categoryNameInput.value
+    }
+    fetch(categoriesAPIURL + "/" + categorySelect.value, {
+            method: "PUT",
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestBody)
-        }).then(function(response) {
-            return response.json()
+            body: JSON.stringify(requestParameters)
         })
-        .then(function(responseJSON) {
-            var resultDiv = document.createElement("div");
-            if (responseJSON["@type"] == "hydra:Error") {
-                console.log("Une erreur est survenue : " + responseJSON["hydra:description"])
-                resultDiv.innerHTML = "Une erreur est survenue";
+        .then((response) => {
+            if (response.status == 200) {
+                infoZoneDiv.textContent = "Modification de la catégorie effectuée";
+                readCategories();
             } else {
-                console.log(responseJSON)
-                resultDiv.innerHTML = "Catégorie créée";
+                infoZoneDiv.textContent = "⚠ Une erreur est survenue lors de la modification de la catégorie";
             }
-            document.body.appendChild(resultDiv);
         })
+    resetForm();
 }
 
+var deleteCategory = function() {
+    // it’s quite straigh forward
+    fetch(categoriesAPIURL + "/" + categorySelect.value, {
+            method: "DELETE",
+        }).then((response) => {
+            if (response.status == 204) {
+                infoZoneDiv.textContent = "Catégorie supprimée";
+            } else {
+                infoZoneDiv.textContent = "⚠ Une erreur est survenue lors de la création de la catégorie";
+            }
+            // we reload categories
+            readCategories();
+        })
+        // we reset buttons and input form’s content
+    resetForm();
+}
+
+// Action for create button
 createButton.addEventListener("click", createCategory);
-
-var selectArticle = document.getElementById('selectArticle');
-
-// GET
-// on va chercher tous les articles
-var articlesList = function(event) {
-    fetch("https://127.0.0.1:8000/api/articles")
-        .then(function(response) {
-            return response.json()
-        })
-        .then((responseJSON) => {
-            var articles = responseJSON["hydra:member"];
-            for (let i = 0; i < articles.length; i++) {
-
-                var option = document.createElement('option');
-                option.value = articles[i].id;
-                option.innerHTML = `${articles[i].title}`;
-                selectArticle.appendChild(option);
-            };
-
-            var divArticle = document.createElement('div');
-            document.querySelector('#articleDisplay').appendChild(divArticle);
-
-            selectArticle.addEventListener('change', () => {
-                var selectValue = parseInt(selectArticle.value);
-
-                while (divArticle.firstChild) {
-                    divArticle.firstChild.remove();
-                }
-
-                var div1 = document.createElement('div')
-                div1.id = "div1";
-                divArticle.appendChild(div1);
-
-                var input = document.createElement('input');
-                input.id = "title";
-                input.value = articles[selectValue - 1].title;
-                div1.appendChild(input);
-
-                var div2 = document.createElement('div')
-                div2.id = "div2";
-                divArticle.appendChild(div2);
-
-                var textarea = document.createElement('textarea');
-                textarea.id = "body";
-                textarea.cols = "40";
-                textarea.rows = "15";
-                textarea.innerHTML = articles[selectValue - 1].body;
-                div2.appendChild(textarea);
-
-                var updateBtn = document.createElement('button');
-                updateBtn.id = "update"
-                updateBtn.innerHTML = "Update";
-                divArticle.appendChild(updateBtn);
-
-                var deleteBtn = document.createElement('button');
-                deleteBtn.id = "delete";
-                deleteBtn.innerHTML = "Delete";
-                divArticle.appendChild(deleteBtn);
-            })
-        })
-}
-
-articlesList();
-
-// PUT
-document.addEventListener('change', () => {
-    var title = document.getElementById('title').value;
-    var body = document.getElementById('body').value;
-    var updateBtn = document.getElementById('update');
-    var deleteBtn = document.getElementById('delete');
-    var articleId = parseInt(selectArticle.value) + 1;
-
-    var updateArticle = function(event) {
-        var requestBody = {
-            "title": title,
-            "body": body
-        };
-        fetch(`https://127.0.0.1:8000/api/articles/${articleId}`, {
-                method: "PUT",
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody)
-            }).then(function(response) {
-                return response.json()
-            })
-            .then(function(responseJSON) {
-                var resultP = document.createElement("p");
-                if (responseJSON["@type"] == "hydra:Error") {
-                    console.log("Une erreur est survenue : " + responseJSON["hydra:description"]);
-                    resultP.innerHTML = "Une erreur est survenue";
-                } else {
-                    console.log(responseJSON);
-                    resultP.innerHTML = "Article mis à jour";
-                }
-                document.querySelector('#result').appendChild(resultP);
-            });
-    };
-
-    updateBtn.addEventListener("click", updateArticle);
-
-    var deleteArticle = function(event) {
-        fetch(`https://127.0.0.1:8000/api/articles/${articleId}`, { method: "DELETE" })
-    };
-
-    deleteBtn.addEventListener("click", deleteArticle);
-});
+// Action for update button
+updateButton.addEventListener("click", updateCategory);
+// Action for delete button
+deleteButton.addEventListener("click", deleteCategory);
+// When we select a category, some things happen 
+categorySelect.addEventListener("change", selectCategory);
+// When document DOM is loaded, we fetch the categories
+document.addEventListener("DOMContentLoaded", readCategories);
